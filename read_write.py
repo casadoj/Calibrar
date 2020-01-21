@@ -2,9 +2,6 @@
 # Funciones de lectura y escritura de diferentes tipos de archivo en Python
 
 import numpy as np
-import matplotlib.pyplot as plt
-get_ipython().magic('matplotlib inline')
-plt.style.use('seaborn-whitegrid')
 import pandas as pd
 from math import floor, ceil
 import os
