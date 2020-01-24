@@ -53,7 +53,7 @@ def read_ascii(filename, datatype='float'):
     return read_ascii
 
 
-def write_ascii(filename, data, attributes, format='%.0f ', coords=None):
+def write_ascii(filename, data, attributes, format='%.0f ', epsg=None):
     """Export a 2D numpy array and its corresponding attributes as an ascii raster. It may also create the '.proj' file that defines the coordinate system.
     
     Parameters:
@@ -62,11 +62,12 @@ def write_ascii(filename, data, attributes, format='%.0f ', coords=None):
 	data:         narray. 2D array with the data to be exported
 	attributes:   narray[6x1]. Array including the following information: ncols, nrows, xllcorner, yllcorner, cellsize, NODATA_value
     format:       string. Format in which the values in 'data' will be exported
-    coords:       srting. EGSG code of the reference coordinate system. If 'None', it doesn't create the 'proj' file
+    epsg:       srting. EGSG code (only figures) of the reference coordinate system. If 'None', it doesn't create the 'proj' file
     
 	Output:
     -------
-    An .asc raster file"""
+    An .asc raster file. Optionally, the associated .prj file
+    """
     
     aux = data.copy()
     
@@ -96,7 +97,15 @@ def write_ascii(filename, data, attributes, format='%.0f ', coords=None):
     ascfile.close()
     
     # export proj file
-    if coords != None:
-        with open(filename + '.prj', 'w+') as projfile:
-            projfile.write(etrs8930N.to_wkt())
-        projfile.close()
+    if epsg != None:
+        import requests
+        # access projection information
+        wkt = requests.get("http://spatialreference.org/ref/epsg/{0}/prettywkt/".format(epsg)).text
+        # remove spaces between charachters
+        wkt = wkt.replace(" ", "")
+        # place all the text on one line
+        wkt = wkt.replace('\n', '')
+        # create the .prj file
+        with open(filename + '.prj', 'w') as projfile:
+            projfile.write(wkt)
+        projfile.close() 
