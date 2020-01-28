@@ -34,7 +34,7 @@ def read_ascii(filename, datatype='float'):
         nrows = int(asc[1].split()[1])
         xllcorner = float(asc[2].split()[1])
         yllcorner = float(asc[3].split()[1])
-        cellsize = int(asc[4].split()[1])
+        cellsize = float(asc[4].split()[1])
         NODATA_value = float(asc[5].split()[1])
         attributes = [ncols, nrows, xllcorner, yllcorner, cellsize, NODATA_value]
         # extract data
