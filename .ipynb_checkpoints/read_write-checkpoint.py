@@ -109,3 +109,39 @@ def write_ascii(filename, data, attributes, format='%.0f ', epsg=None):
         with open(filename + '.prj', 'w') as projfile:
             projfile.write(wkt)
         projfile.close() 
+        
+        
+def correct_ascii(file, format='%.0f '):
+    """Elimina filas y/o columnas del ascii con todo NaN
+    
+    Parámetros:
+    -----------
+    file:      string. Ruta, nombre y extensión del archivo ascii
+    
+    Salida:
+    -------
+    Sobreescribe el archivo ascii con la correción"""
+    
+    
+    # importar archivo
+    read_ascii(file)
+    data = read_ascii.data
+    atr = read_ascii.attributes
+    x = np.arange(atr[2], atr[2] + atr[0] * atr[4], atr[4])
+    y = np.arange(atr[3], atr[3] + atr[1] * atr[4], atr[4])[::-1]
+    # eliminar filas y columnas vacías
+    maskRow = np.isnan(data).all(axis=1)
+    maskCol = np.isnan(data).all(axis=0)
+    data = data[~maskRow, :]
+    data = data[:, ~maskCol]
+    x = x[~maskCol]
+    y = y[~maskRow]
+    # corregir atributos
+    atr[0], atr[1] = data.shape[1], data.shape[0]
+    atr[2], atr[3] = x[0], y[-1]
+    # exportar ascii corregido
+    write_ascii(file, data, atr, format=format)
+    
+    # guardar corrección
+    correct_ascii.data = data
+    correct_ascii.attributes = atr
