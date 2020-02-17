@@ -58,7 +58,7 @@ def write_ascii(filename, data, attributes, format='%.0f ', epsg=None):
     
     Parameters:
     -----------
-    filename:     string. Name (including path) of the ASCII file
+    filename:     string. Name (including path and extension) of the ASCII file
 	data:         narray. 2D array with the data to be exported
 	attributes:   narray[6x1]. Array including the following information: ncols, nrows, xllcorner, yllcorner, cellsize, NODATA_value
     format:       string. Format in which the values in 'data' will be exported
