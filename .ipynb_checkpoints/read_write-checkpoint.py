@@ -80,7 +80,7 @@ def write_ascii(filename, data, attributes, format='%.0f ', epsg=None):
     aux[np.isnan(aux)] = attributes[5]
     
     # export ascii
-    with open(filename + '.asc', 'w+') as ascfile:
+    with open(filename, 'w+') as ascfile:
         # write attributes
         ascfile.write('ncols\t\t{0:<8}\n'.format(attributes[0]))
         ascfile.write('nrows\t\t{0:<8}\n'.format(attributes[1]))
@@ -106,7 +106,7 @@ def write_ascii(filename, data, attributes, format='%.0f ', epsg=None):
         # place all the text on one line
         wkt = wkt.replace('\n', '')
         # create the .prj file
-        with open(filename + '.prj', 'w') as projfile:
+        with open(filename[:-4] + '.prj', 'w') as projfile:
             projfile.write(wkt)
         projfile.close() 
         
@@ -117,6 +117,7 @@ def correct_ascii(file, format='%.0f '):
     Parámetros:
     -----------
     file:      string. Ruta, nombre y extensión del archivo ascii
+    format:    string. Formato en el que exportar los valores del ascii
     
     Salida:
     -------
