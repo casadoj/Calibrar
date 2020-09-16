@@ -18,14 +18,14 @@ def read_ascii(filename, datatype='float'):
     Output:
     -------
     Results are given as methods of the function
-	attributes:   list. A list of six attributes:
-						ncols:        int. Number of columns
-						nrows:        int. Number of rows
-						xllcorner:    float. X coordinate of the left lower corner
-						yllcorner:    float. Y coordinate of the left lower corner
-						cellsize:     int. Spatial discretization
-						NODATA_value: float. Value representing no data
-	data:         naddary[nrows,ncols]. The data in the map"""
+        attributes:   list. A list of six attributes:
+        ncols:        int. Number of columns
+        nrows:        int. Number of rows
+        xllcorner:    float. X coordinate of the left lower corner
+        yllcorner:    float. Y coordinate of the left lower corner
+        cellsize:     int. Spatial discretization
+        NODATA_value: float. Value representing no data
+        data:         naddary[nrows,ncols]. The data in the map"""
 
     with open(filename, 'r+') as file:
         # import all the lines in the file
@@ -50,7 +50,7 @@ def read_ascii(filename, datatype='float'):
     read_ascii.attributes = attributes
     read_ascii.data = data
 
-    return read_ascii
+#     return read_ascii
 
 
 def write_ascii(filename, data, attributes, format='%.0f ', epsg=None):
