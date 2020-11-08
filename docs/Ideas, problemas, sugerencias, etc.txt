@@ -1,0 +1,2 @@
+Cosas a hacer:
+* Rehacer la interpolación espacial a 500 m al menos, para que sea igual que las celdas de MODIS. ¿O a qué resolución se va a hacer la hidrología?
