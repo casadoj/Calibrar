@@ -1,2 +1,4 @@
 Cosas a hacer:
 * Rehacer la interpolación espacial a 500 m al menos, para que sea igual que las celdas de MODIS. ¿O a qué resolución se va a hacer la hidrología?
+* MODIS da un mapa cada 8 días con la extensión máxima de la nieve. El modelo genera un mapa diario de SWE.
+* Reclasificación de datos MODIS de cobertura de nieve.
