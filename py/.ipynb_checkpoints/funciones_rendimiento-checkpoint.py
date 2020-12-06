@@ -131,3 +131,42 @@ def matriz_confusion(obs, sim):
     acierto = pd.DataFrame(acierto, index=['obs0', 'obs1'], columns=['sim0', 'sim1'])
     
     return acierto
+
+    
+
+def rend_espacial(dates, obs, sim, plot=True):
+    """Calcula el SPAEF y KGE espacial entre las matrices observadas y simuladas
+    
+    Parámetros:
+    -----------
+    dates:     array (t,). Lista de fechas a la que corresponden los mapas
+    obs:       array (t,n,m). Mapas observados
+    sim:       array (t,n,m). Mapas simulados
+    plot:      boolean. Si se quiere mostrar los resultados en forma de gráfico
+    
+    Salida:
+    -------
+    rend:      dataframe (t,2). Valores del SPAEF y KGE para cada una de las fechas"""
+    
+    # comprobar que los datos de entrada son correctos
+    if obs.shape != sim.shape:
+        print('ERROR. No coinciden las dimensiones de la matriz observada y simulada')
+    if len(dates) != obs.shape[0]:
+        print('ERROR. No coincide la longitud de "dates" con la primera dimensión de las matrices')
+    
+    # calcular rendimiento
+    rend = pd.DataFrame(index=dates, columns=['KGE', 'SPAEF'])
+    for d, date in enumerate(dates):
+        rend.loc[date, 'KGE'] = KGEsp(obs[d,:,:], sim[d,:,:])
+        rend.loc[date, 'SPAEF'] = SPAEF(obs[d,:,:], sim[d,:,:])
+        
+    if plot == True:
+        fig, ax = plt.subplots(figsize=(8,4))
+        lw = 1.2
+        ax.plot(rend.KGE, color='lightsteelblue', lw=lw, label='KGE')
+        ax.plot(rend.SPAEF, color='indianred', lw=lw, label='SPAEF')
+        ax.set(xlim=(dates[0], dates[-1]), ylim=(-2, 1))
+        fig.legend(loc=8, bbox_to_anchor=(0.25, -0.025, 0.5, 0.1), ncol=2, fontsize=13)
+        plt.tight_layout()
+    
+    return rend
