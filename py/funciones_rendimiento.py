@@ -131,5 +131,3 @@ def matriz_confusion(obs, sim):
     acierto = pd.DataFrame(acierto, index=['obs0', 'obs1'], columns=['sim0', 'sim1'])
     
     return acierto
-
-    
