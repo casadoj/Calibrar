@@ -295,7 +295,7 @@ class raster3D:
             return modis
         
 
-    def reproyectar(self, crsOut, cellsize, n_neighbors=1, weights='distance', p=2,
+    def reproyectar(self, crsOut, cellsize, n_neighbors=1, weights='distance', p=2, fillna=None,
                     snap=None, inplace=False):
         """Proyecta la malla de raster3D desde su sistema de coordenadas original (sinusoidal) al sistema deseado en una malla regular de tamaño definido.
 
@@ -354,9 +354,12 @@ class raster3D:
         # interpolar mapas en la malla
         data_ = np.empty((len(times), len(Ygrid), len(Xgrid)), dtype=float)
         for t, time in enumerate(times):
-            print('Paso {0} de {1}:\t{2}'.format(t+1, len(times), time), end='\r')
-            data_[t,:,:] = interpolarNN(XXorig, YYorig, data[t,:,:], XXgrid, YYgrid,
-                                        n_neighbors=n_neighbors,  weights=weights, p=p)
+            try:
+                print('Paso {0} de {1}:\t{2}'.format(t+1, len(times), time), end='\r')
+                data_[t,:,:] = interpolarNN(XXorig, YYorig, data[t,:,:], XXgrid, YYgrid,
+                                            n_neighbors=n_neighbors,  weights=weights, p=p, fillna=fillna)
+            except:
+                data_[t,:,:] = np.nan
         
         if inplace:
             self.data = data_
@@ -398,7 +401,7 @@ class raster3D:
 # In[4]:
 
 
-def interpolarNN(XXorig, YYorig, mapa, XXgrid, YYgrid, n_neighbors=1, weights='distance', p=1):
+def interpolarNN(XXorig, YYorig, mapa, XXgrid, YYgrid, n_neighbors=1, weights='distance', p=1, fillna=None):
     """Interpolar un mapa desde una malla original a otra malla regular. Se utiliza el algoritno de vencinos cercanos.
     Utilizando como pesos 'distance' y como exponente 'p=2' es el método de la distancia inversa al cuadrado.
     
@@ -425,6 +428,8 @@ def interpolarNN(XXorig, YYorig, mapa, XXgrid, YYgrid, n_neighbors=1, weights='d
         y = mapa.data.flatten().astype(float)
     else:
         y = mapa.flatten().astype(float)
+    if fillna is not None:
+        y[np.isnan(y)] = fillna
     mask = np.isnan(y)
     y = y[~mask]
     # feature matrix
@@ -441,6 +446,8 @@ def interpolarNN(XXorig, YYorig, mapa, XXgrid, YYgrid, n_neighbors=1, weights='d
     X_ = np.vstack((XXgrid.flatten(), YYgrid.flatten())).T
     # predecir
     pred = neigh.predict(X_).reshape(XXgrid.shape)
+    if fillna is not None:
+        pred[pred == fillna] = np.nan
     
     return pred
 
