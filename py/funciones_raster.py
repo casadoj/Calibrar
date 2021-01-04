@@ -23,6 +23,7 @@ import matplotlib.pyplot as plt
 import re
 from pyproj import Transformer, CRS
 from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
+from datetime import datetime, timedelta
 
 
 # ```Python
@@ -115,6 +116,49 @@ class raster2D:
         self.cellsize = cellsize
         self.attributes = [len(X), len(Y), X.min(), Y.min(), cellsize, noData]
         self.extent = [X.min(), X.max() + cellsize, Y.min(), Y.max() + cellsize]
+        
+        
+    def remuestrear(self, rasterObj, mask=None, inplace=False, verbose=True,
+                algorithm='regressor'):
+        """Modifica la resolución del raster a la del raster objetivo. El remuestreo se hace mediante la media.
+
+        Entradas:
+        ---------
+        self:      raster3D (t,y,x). Datos de partida
+        rasterObj: raster3D (T,Y,X). Define la malla del raster remuestreado
+        mask:      array (Y,X). Recorta el raster remuestreado
+        verbose:   boolean. Mostrar el proceso por pantall
+
+        Salida:
+        -------
+        remuestreo: raster3D (t,Y,X). Datos originales remuestreados a la malla de 'rasterObj'
+        """    
+
+        # extraer información del raster original
+        data = self.data
+
+        # malla del raster original
+        Xorig = self.X
+        Yorig = self.Y
+        XXorig, YYorig = np.meshgrid(Xorig, Yorig)
+
+        # malla del raster objetivo
+        Xgrid = rasterObj.X
+        Ygrid = rasterObj.Y
+        XXgrid, YYgrid = np.meshgrid(Xgrid, Ygrid)
+
+        # vecinos cercanos
+        resOrig = np.mean(np.diff(Xorig))
+        resGrid = np.mean(np.diff(Xgrid))
+        n_neighbors = int(np.ceil(resGrid / resOrig)**2)
+        
+        data_ = interpolarNN(XXorig, YYorig, data, XXgrid, YYgrid, algorithm, n_neighbors,
+                            weights='uniform', mask=mask)
+        
+        if inplace:
+            self.data, self.X, self.Y = data_, Xgrid, Ygrid
+        else:
+            return raster2D(data_, Xgrid,Ygrid, self.crs, self.noData)
 
 
 # ### raster3D
@@ -147,9 +191,56 @@ class raster3D:
         self.label = label
         self.crs = crs
         
+    
+    def agregar(self, w, agg='sum', inplace=False, verbose=True):
+        """Agregar el raster3D diario a una ventana diaria
+
+        Entradas:
+        ---------
+        self:    raster3D (t,y,x)
+        w:       int. Nº de días de la ventana temporal
+        agg:     string. Tipo de agregación: 'sum' o 'mean'
+        verbose: boolean
+
+        Salidas:
+        --------
+        agregado: raster3D (t',y,x)
+        """
+
+        # extraer información
+        data = self.data
+        times = self.times
+
+        # agregar datos
+        for i, time in enumerate(times[::w]):
+            if verbose:
+                print(time, end='\r')
+            j = (time - times.min()).days
+            if (time + timedelta(w)).year > time.year:
+                w_ = (datetime(time.year + 1, 1, 1).date() - time).days
+            else:
+                w_ = w
+            if agg == 'sum':
+                temp = np.sum(data[j:j+w_,:,:], axis=0)
+            elif agg == 'mean':
+                temp = np.mean(data[j:j+w_,:,:], axis=0)
+            if i == 0:
+                data_ = temp[np.newaxis,:,:]
+                times_ = [time]
+            else:
+                data_ = np.vstack((data_, temp[np.newaxis,:,:]))
+                times_.append(time)
+        
+        if inplace:
+            self.data, self.times = data_, times_
+        else:
+            return raster3D(data_, self.X, self.Y, times_, self.units, self.variable, self.label, self.crs)
+
+        
     def cellsize(self):
         
         return np.diff(self.X).mean()
+    
     
     def extent(self):
         
@@ -173,33 +264,37 @@ class raster3D:
         raster:  raster3D.
         """
 
-        def of(array, start, end):
-            """Posición inicial y final de 'start' y 'end' dentro del array."""
+        #def of(array, start, end):
+        #    """Posición inicial y final de 'start' y 'end' dentro del array."""
 
-            o = np.where(array == start)[0][0]
-            f = np.where(array == end)[0][0] + 1
+            #o = np.where(array == start)[0][0]
+            #f = np.where(array == end)[0][0] + 1
 
-            return o, f
+            #return o, f
 
         data, X, Y, times = self.data, self.X, self.Y, self.times
 
         if axis == 0:
-            o, f = of(times, start, end)
-            data = self.data[o:f,:,:]
-            times = times[o:f]
+            mask = (times >= start) & (times <= end)
+            #o, f = of(times, start, end)
+            data = self.data[mask,:,:]
+            times = times[mask]
         elif axis == 1:
-            o, f = of(Y, start, end)
-            data = self.data[:,o:f,:]
-            Y = Y[o:f]
+            mask = (Y >= start) & (Y <= end)
+            #o, f = of(Y, start, end)
+            data = self.data[:,mask,:]
+            Y = Y[mask]
         elif axis == 2:
-            o, f = of(X, start, end)
-            data = self.data[:,:,o:f]
-            X = X[o:f]
+            mask = (X >= start) & (X <= end)
+            #o, f = of(X, start, end)
+            data = self.data[:,:,mask]
+            X = X[mask]
 
         if inplace:
             self.data, self.X, self.Y, self.times = data, X, Y, times
         else:
             return raster3D(data, X, Y, times, self.units, self.variable, self.label, self.crs)
+    
     
     def enmascararNaN(self):
         """Enmascara los datos en aquellas celdas con todo NaN en la serie temporal.      
@@ -293,6 +388,56 @@ class raster3D:
             modis = raster3D(data_ma, X, Y, self.times, self.units, self.variable, self.label, crs=self.crs)
             modis.mask3D = mask3D
             return modis
+        
+        
+    def remuestrear(self, rasterObj, mask=None, inplace=False, verbose=True, algorithm='regressor'):
+        """Modifica la resolución del raster a la del raster objetivo. El remuestreo se hace mediante la media.
+
+        Entradas:
+        ---------
+        self:      raster3D (t,y,x). Datos de partida
+        rasterObj: raster3D (T,Y,X). Define la malla del raster remuestreado
+        mask:      array (Y,X). Recorta el raster remuestreado
+        verbose:   boolean. Mostrar el proceso por pantall
+        algorithm:   string. Tipo de algoritmo de vecinos cercanos a utilizar: 'regressor' para variables continuas, 'classifier' para variables discretas
+
+        Salida:
+        -------
+        remuestreo: raster3D (t,Y,X). Datos originales remuestreados a la malla de 'rasterObj'
+        """    
+
+        # extraer información del raster original
+        data = self.data
+
+        # malla del raster original
+        Xorig = self.X
+        Yorig = self.Y
+        XXorig, YYorig = np.meshgrid(Xorig, Yorig)
+
+        # malla del raster objetivo
+        Xgrid = rasterObj.X
+        Ygrid = rasterObj.Y
+        XXgrid, YYgrid = np.meshgrid(Xgrid, Ygrid)
+
+        # vecinos cercanos
+        resOrig = np.mean(np.diff(Xorig))
+        resGrid = np.mean(np.diff(Xgrid))
+        n_neighbors = int(np.ceil(resGrid / resOrig)**2)
+
+        for t, time in enumerate(self.times):
+            if verbose:
+                print('{0}: {1:<4} de {2:<4}'.format(time, t+1, len(self.times)), end='\r')
+            temp = interpolarNN(XXorig, YYorig, data[t,:,:], XXgrid, YYgrid, algorithm, n_neighbors,
+                                weights='uniform', mask=mask)
+            if t == 0:
+                data_ = temp[np.newaxis,:,:]
+            else:
+                data_ = np.vstack((data_, temp[np.newaxis,:,:]))
+        
+        if inplace:
+            self.data, self.X, self.Y = data_, Xgrid, Ygrid
+        else:
+            return raster3D(data_, Xgrid,Ygrid, self.times, self.units, self.variable, self.label, self.crs)
         
 
     def reproyectar(self, crsOut, cellsize, n_neighbors=1, weights='distance', p=2, fillna=None,
@@ -401,7 +546,8 @@ class raster3D:
 # In[4]:
 
 
-def interpolarNN(XXorig, YYorig, mapa, XXgrid, YYgrid, n_neighbors=1, weights='distance', p=1, fillna=None):
+def interpolarNN(XXorig, YYorig, mapa, XXgrid, YYgrid, algorithm='regressor', n_neighbors=1, weights='distance', p=1,
+                 fillna=None, mask=None):
     """Interpolar un mapa desde una malla original a otra malla regular. Se utiliza el algoritno de vencinos cercanos.
     Utilizando como pesos 'distance' y como exponente 'p=2' es el método de la distancia inversa al cuadrado.
     
@@ -412,14 +558,18 @@ def interpolarNN(XXorig, YYorig, mapa, XXgrid, YYgrid, n_neighbors=1, weights='d
     mapa:        np.array (r1, c1). Valores de la variable en los puntos del mapa de origen
     XXgrid:      np.array (r2, c2). Coordenadas X de los puntos del mapa objetivo
     YYgrid:      np.array (r2, c2). Coordenadas Y de los puntos del mapa objetivo
+    algorithm:   string. Tipo de algoritmo de vecinos cercanos a utilizar: 'regressor' para variables continuas, 'classifier' para variables discretas
     n_neighbors: int. Nº de vecinos cercanos, es decir, los puntos a tener en cuenta en la interpolación de cada celda de la malla.
     weights:     str. Tipo de ponderación: 'uniform', 'distance'
     p:           int. Exponente al que elevar 'weights' a la hora de ponderar
+    fillna:      int or float. Valor por el que remplazar los NaN. Tras la interpolación, las celdas con este valor se vuelven a convertir en NaN
+    mask:        np.array (r2, c2). Máscara con la que recortar el mapa de la predicción
     
     Salida:
     -------
     pred:         np.array (r2, c2). Valores de la varible interpolados en la mall objetivo
     """
+    
     
     # AJUSTE
     # ......
@@ -430,14 +580,19 @@ def interpolarNN(XXorig, YYorig, mapa, XXgrid, YYgrid, n_neighbors=1, weights='d
         y = mapa.flatten().astype(float)
     if fillna is not None:
         y[np.isnan(y)] = fillna
-    mask = np.isnan(y)
-    y = y[~mask]
+    maskNaN = np.isnan(y)
+    y = y[~maskNaN]
     # feature matrix
 #     XXorig, YYorig = np.meshgrid(Xorig, Yorig)
     X = np.vstack((XXorig.flatten(), YYorig.flatten())).T
-    X = X[~mask,:]
+    X = X[~maskNaN,:]
     # definir y ajustar el modelo
-    neigh = KNeighborsRegressor(n_neighbors=n_neighbors, weights=weights, p=p).fit(X, y)
+    if algorithm == 'regressor':
+        neigh = KNeighborsRegressor(n_neighbors=n_neighbors, weights=weights, p=p).fit(X, y)
+    elif algorithm == 'classifier':
+        neigh = KNeighborsClassifier(n_neighbors=n_neighbors, weights=weights, p=p).fit(X, y)
+    else:
+        print('ERROR. Valor incorrecto de "algorithm":', algorithm)
     
     # PREDICCIÓN
     # ..........
@@ -448,6 +603,12 @@ def interpolarNN(XXorig, YYorig, mapa, XXgrid, YYgrid, n_neighbors=1, weights='d
     pred = neigh.predict(X_).reshape(XXgrid.shape)
     if fillna is not None:
         pred[pred == fillna] = np.nan
+    if mask is not None:
+        if mask.shape == pred.shape:
+            pred[mask] = np.nan
+        else:
+            print('ERROR. Las dimensiones de la máscara no son iguales a las de XXgrid y YYgrid.')
+            return
     
     return pred
 
@@ -531,12 +692,15 @@ def recortarRaster(data, X, Y, polygon, crs=None, buffer=None):
 # In[6]:
 
 
-def read_ascii(filename, datatype='float', crs=None):
+def read_ascii(filename, datatype='float', crs=None, dropna=True):
     """Import an ASCII file. Data is saved as a 2D numpy array and the attributes as integers or floating point numbers.
 
     Parameters:
     -----------
     filename:     string. Name (including path and extension) of the ASCII file
+    datatype:     string. Tipo de datos
+    crs:          int. Código epsg del sistema de coordenadas
+    dropna:       boolean. Si se quieren eliminar filas y columnas con todo NaN
 
     Output:
     -------
@@ -570,9 +734,19 @@ def read_ascii(filename, datatype='float', crs=None):
         data = data.astype(datatype)
     file.close()
     
-    # guardar objeto como raster2D
+    # array de coordenadas X e Y
     X = np.arange(xllcorner, xllcorner + ncols * cellsize, cellsize)
     Y = np.arange(yllcorner, yllcorner + nrows * cellsize, cellsize)[::-1]
+    
+    if dropna:
+        maskrows = ~np.all(np.isnan(data), axis=1)
+        maskcols = ~np.all(np.isnan(data), axis=0)
+        data = data[maskrows,:][:,maskcols]
+        X = X[maskcols]
+        Y = Y[maskrows]
+    
+    # guardar objeto como raster2D
+
     if crs is not None:
         crs = CRS.from_epsg(crs)
     raster = raster2D(data, X, Y, crs, noData=NODATA_value)
